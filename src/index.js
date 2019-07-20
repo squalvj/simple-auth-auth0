@@ -6,6 +6,8 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const jwt = require('express-jwt');
+const jwksRsa = require('jwks-rsa');
 const {startDatabase} = require('./database/mongo');
 const {insertAd, getAds, updateAd, deleteAd} = require('./database/ads');
 
@@ -29,8 +31,25 @@ app.get('/', async (req, res) => {
    res.send(await getAds());
 });
 
+const checkJwt = jwt({
+  secret: jwksRsa.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 5,
+    jwksUri: `https://dev-efyrd9pd.auth0.com/.well-known/jwks.json`
+  }),
+
+  // Validate the audience and the issuer.
+  audience: 'https://ads-api',
+  issuer: `https://dev-efyrd9pd.auth0.com/`,
+  algorithms: ['RS256']
+});
+
+app.use(checkJwt);
+
 app.post('/', async (req, res) => {
   const newAd = req.body;
+  console.log({user: req.user})
   await insertAd(newAd);
   res.send({ message: 'New ad inserted.' });
 });
@@ -47,6 +66,7 @@ app.put('/:id', async (req, res) => {
   await updateAd(req.params.id, updatedAd);
   res.send({ message: 'Ad updated.' });
 });
+
 
 // start the in-memory MongoDB instance
 startDatabase().then(async () => {
